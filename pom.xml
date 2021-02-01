@@ -1,0 +1,183 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+
+    Copyright (C) 2021 DANS - Data Archiving and Networked Services (info@dans.knaw.nl)
+
+    Licensed under the Apache License, Version 2.0 (the "License");
+    you may not use this file except in compliance with the License.
+    You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+    Unless required by applicable law or agreed to in writing, software
+    distributed under the License is distributed on an "AS IS" BASIS,
+    WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+    See the License for the specific language governing permissions and
+    limitations under the License.
+
+-->
+<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    <modelVersion>4.0.0</modelVersion>
+
+    <parent>
+        <groupId>nl.knaw.dans.shared</groupId>
+        <artifactId>dans-scala-app-project</artifactId>
+        <version>6.0.3</version>
+    </parent>
+
+    <groupId>nl.knaw.dans.dd</groupId>
+    <artifactId>dd-vault-catalog</artifactId>
+    <version>1.0.0-SNAPSHOT</version>
+
+    <name>DD Vault Catalog</name>
+    <url>https://github.com/DANS-KNAW/dd-vault-catalog</url>
+    <description>Vault Catalog</description>
+    <inceptionYear>2021</inceptionYear>
+
+    <properties>
+        <main-class>nl.knaw.dans.dd.catalog.Command</main-class>
+    </properties>
+
+    <scm>
+        <developerConnection>scm:git:https://github.com/DANS-KNAW/dd-vault-catalog</developerConnection>
+        <tag>HEAD</tag>
+    </scm>
+
+    <dependencies>
+        <!-- testing -->
+        <dependency>
+            <groupId>org.scalatest</groupId>
+            <artifactId>scalatest_2.12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalamock</groupId>
+            <artifactId>scalamock_2.12</artifactId>
+        </dependency>
+
+        <!-- Scala utils -->
+        <dependency>
+            <groupId>org.rogach</groupId>
+            <artifactId>scallop_2.12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.jsuereth</groupId>
+            <artifactId>scala-arm_2.12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>com.github.pathikrit</groupId>
+            <artifactId>better-files_2.12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>nl.knaw.dans.lib</groupId>
+            <artifactId>dans-scala-lib_2.12</artifactId>
+        </dependency>
+
+        <!-- Apache Commons -->
+        <dependency>
+            <groupId>commons-configuration</groupId>
+            <artifactId>commons-configuration</artifactId>
+        </dependency>
+
+        <!-- service -->
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-server</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.eclipse.jetty</groupId>
+            <artifactId>jetty-servlet</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>org.scalatra</groupId>
+            <artifactId>scalatra_2.12</artifactId>
+        </dependency>
+        <dependency>
+            <groupId>javax.servlet</groupId>
+            <artifactId>javax.servlet-api</artifactId>
+        </dependency>
+
+        <!-- logging -->
+        <dependency>
+            <groupId>ch.qos.logback</groupId>
+            <artifactId>logback-classic</artifactId>
+        </dependency>
+    </dependencies>
+
+    <repositories>
+        <repository>
+            <id>dans-releases</id>
+            <releases>
+                <enabled>true</enabled>
+            </releases>
+            <snapshots>
+                <enabled>false</enabled>
+            </snapshots>
+            <url>https://maven.dans.knaw.nl/releases/</url>
+        </repository>
+        <repository>
+            <id>dans-snapshots</id>
+            <releases>
+                <enabled>false</enabled>
+            </releases>
+            <snapshots>
+                <enabled>true</enabled>
+            </snapshots>
+            <url>https://maven.dans.knaw.nl/snapshots/</url>
+        </repository>
+    </repositories>
+
+    <build>
+        <plugins>
+            <plugin>
+                <groupId>com.mycila</groupId>
+                <artifactId>license-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-release-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-jar-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <artifactId>maven-assembly-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>exec-maven-plugin</artifactId>
+            </plugin>
+            <plugin>
+                <groupId>org.scalatest</groupId>
+                <artifactId>scalatest-maven-plugin</artifactId>
+            </plugin>
+        </plugins>
+    </build>
+
+    <profiles>
+        <profile>
+            <id>rpm</id>
+            <activation>
+                <activeByDefault>false</activeByDefault>
+                <file>
+                    <exists>/usr/local/bin/rpm</exists>
+                </file>
+            </activation>
+            <build>
+                <plugins>
+                    <plugin>
+                        <groupId>org.codehaus.mojo</groupId>
+                        <artifactId>rpm-maven-plugin</artifactId>
+                        <executions>
+                            <execution>
+                                <id>attach-rpm</id>
+                                <goals>
+                                    <goal>attached-rpm</goal>
+                                </goals>
+                            </execution>
+                        </executions>
+                    </plugin>
+                </plugins>
+            </build>
+        </profile>
+    </profiles>
+</project>

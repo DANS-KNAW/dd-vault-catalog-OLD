@@ -1,0 +1,18 @@
+[Unit]
+Description=DD Vault Catalog Service
+
+[Service]
+ExecStart=/bin/java \
+   $INITIAL_HEAP_SIZE \
+   -Dlogback.configurationFile=/etc/opt/dans.knaw.nl/dd-vault-catalog/logback-service.xml \
+   -Dapp.home=/opt/dans.knaw.nl/dd-vault-catalog \
+   -Dorg.scalatra.environment="production" \
+   -jar /opt/dans.knaw.nl/dd-vault-catalog/bin/dd-vault-catalog.jar run-service
+# Java returns 143 even if the SIGTERM was handled correctly.
+SuccessExitStatus=143
+
+User=dd-vault-catalog
+Group=dd-vault-catalog
+
+[Install]
+WantedBy=multi-user.target
