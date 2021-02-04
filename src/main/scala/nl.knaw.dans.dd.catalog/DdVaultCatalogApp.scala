@@ -17,8 +17,10 @@ package nl.knaw.dans.dd.catalog
 
 import scala.util.{ Success, Try }
 
+
 class DdVaultCatalogApp(configuration: Configuration)  {
 
+  val config: Configuration = configuration
 
 
 }

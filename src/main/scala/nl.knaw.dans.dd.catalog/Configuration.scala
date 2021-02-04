@@ -22,7 +22,11 @@ import org.apache.commons.configuration.PropertiesConfiguration
 
 case class Configuration(version: String,
                          serverPort: Int,
-                         // other configuration properties defined in application.properties
+                         dbUrl: String,
+                         dbPort: Int,
+                         dbName: String,
+                         dbUser: String,
+                         dbPassword: String
                         )
 
 object Configuration extends DebugEnhancedLogging {
@@ -45,7 +49,11 @@ object Configuration extends DebugEnhancedLogging {
     new Configuration(
       version,
       serverPort = properties.getInt("daemon.http.port"),
-      // read other properties defined in application.properties
+      dbUrl = properties.getString("db.url"),
+      dbPort = properties.getInt("db.port"),
+      dbName = properties.getString("db.name"),
+      dbUser = properties.getString("db.user"),
+      dbPassword = properties.getString("db.password")
     )
   }
 }
