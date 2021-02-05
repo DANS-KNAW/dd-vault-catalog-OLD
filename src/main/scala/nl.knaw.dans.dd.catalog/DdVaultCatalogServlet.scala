@@ -31,6 +31,7 @@ import org.json4s.scalap.~
 import java.nio.charset.StandardCharsets
 import scala.collection.JavaConversions._
 import java.sql.{DriverManager, ResultSet, Statement}
+import scala.collection.mutable.ListBuffer
 
 class DdVaultCatalogServlet(app: DdVaultCatalogApp,
                             version: String) extends ScalatraServlet with DebugEnhancedLogging {
@@ -88,55 +89,58 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
     val conn = DriverManager.getConnection(con_str)
 
     try {
-      val stm = conn.createStatement(ResultSet.TYPE_SCROLL_SENSITIVE, ResultSet.CONCUR_UPDATABLE)
 
-      {
-        val rs = stm.executeQuery("SELECT * FROM catalog")
-        val rs2 = stm.executeQuery("SELECT * FROM ocfl_version")
-        rs.moveToInsertRow()
-        rs.updateString("dataverse_pid", dataverse_pid)
-        rs.updateString("dataverse_pid_version", dataverse_pid_version)
-        rs.updateString("bag_id", bag_id)
-        rs.updateString("nbn", nbn)
-        rs.updateString("bag_file_path", bag_file_path)
-        rs.updateString("depositor", depositor)
-        rs.updateString("title", title)
+      val update_catalog = "INSERT INTO catalog(dataverse_pid, dataverse_pid_version, bag_id, nbn,bag_file_path, depositor, title) " +
+        "VALUES(?,?,?,?,?,?,?)"
+      val catalog_stmt = conn.prepareStatement(update_catalog)
 
-        rs2.moveToInsertRow()
-        rs2.updateString("metadata", metadata)
-        rs2.updateString("object_version_checksum", object_version_checksum)
-        rs2.updateDate("object_version_deposit_date", new java.sql.Date(System.currentTimeMillis()))
-        rs2.updateString("bag_id", bag_id)
-        rs2.updateString("object_version", "")
-        rs2.updateString("object_version_file_path", bag_file_path)
+      val update_ocfl = "INSERT INTO ocfl_version(metadata, object_version_checksum, object_version_deposit_date, bag_id, object_version, object_version_file_path) " +
+        "VALUES(?,?,?,?,?,?)"
+      val ocfl_stmt = conn.prepareStatement(update_ocfl)
 
-        rs.insertRow()
-        rs.beforeFirst()
+      catalog_stmt.setString(1, dataverse_pid)
+      catalog_stmt.setString(2, dataverse_pid_version)
+      catalog_stmt.setString(3, bag_id)
+      catalog_stmt.setString(4, nbn)
+      catalog_stmt.setString(5, bag_file_path)
+      catalog_stmt.setString(6, depositor)
+      catalog_stmt.setString(7, title)
 
-        rs2.insertRow()
-        rs2.beforeFirst()
-      }
+      ocfl_stmt.setString(1, metadata)
+      ocfl_stmt.setString(2, object_version_checksum)
+      ocfl_stmt.setDate(3, new java.sql.Date(System.currentTimeMillis()))
+      ocfl_stmt.setString(4, bag_id)
+      ocfl_stmt.setString(5, "")
+      ocfl_stmt.setString(6, bag_file_path)
+
+      catalog_stmt.executeUpdate()
+      ocfl_stmt.executeUpdate()
+
+      //TODO return proper status codes
+
     }
+
   }
 
   get("/catalog") {
     contentType = "application/json"
-    println("Postgres connector")
 
     classOf[org.postgresql.Driver]
     val con_str = "jdbc:postgresql://localhost:5433/dv2tape?user=postgres"
     val conn = DriverManager.getConnection(con_str)
+    var catalog_output = new ListBuffer[JObject]()
     try {
       val stm = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
 
       val rs = stm.executeQuery("SELECT * from catalog NATURAL JOIN ocfl_version")
 
+
       while (rs.next) {
 
         val catalog = Catalog(rs.getString("dataverse_pid"), rs.getString("dataverse_pid_version"), rs.getString("bag_id"), rs.getString("nbn"), rs.getString("bag_file_path"), rs.getString("depositor"), rs.getString("title"))
-        val ocfl = OcflVersion(rs.getString("metadata"),rs.getString("object_version_checksum"),rs.getDate("object_version_deposit_date"),rs.getString("bag_id"),rs.getString("object_version"),rs.getString("object_version_file_path"))
+        val ocfl = OcflVersion(rs.getString("metadata"), rs.getString("object_version_checksum"), rs.getDate("object_version_deposit_date"), rs.getString("bag_id"), rs.getString("object_version"), rs.getString("object_version_file_path"))
         json =
-            ("catalog" ->
+          ("archived_dataset" ->
             ("dataverse_pid" -> catalog.dataverse_pid) ~
               ("dataverse_pid_version" -> catalog.dataverse_pid_version) ~
               ("bag_id" -> catalog.bag_id) ~
@@ -151,13 +155,20 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
               ("object_version" -> ocfl.object_version) ~
               ("object_version_file_path" -> ocfl.object_version_file_path)
             )
-
-        println(pretty(render(json)))
+        catalog_output.append(json)
+        //println(pretty(render(json)))
       }
     } finally {
       conn.close()
     }
-    pretty(render(json))
+    response.getOutputStream
+    //TODO fix json return body, nothing returned
+    for (json <- catalog_output){
+      json
+      //pretty(render(json))
+      //println(pretty(render(json)))
+    }
+
   }
 
 
