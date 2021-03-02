@@ -18,19 +18,21 @@ package nl.knaw.dans.dd.catalog
 import com.fasterxml.jackson.databind.ObjectMapper
 import nl.knaw.dans.lib.logging.DebugEnhancedLogging
 import org.json4s.JsonDSL._
-import org.json4s.native.JsonMethods
+import org.json4s.native.{JsonMethods, prettyJson}
 import org.json4s.native.JsonMethods.{pretty, render}
 import org.json4s.{DefaultFormats, Formats, JsonAST}
 import org.scalatra._
 import com.fasterxml.jackson.databind.JsonNode
 import nl.knaw.dans.dd.catalog.Command.app
-import org.json4s.JsonAST.JObject
+import org.json4s.JsonAST.{JObject, JValue}
 import org.json4s.scalap.scalasig.ClassFileParser._
 import org.json4s.scalap.~
+import org.postgresql.Driver
 
 import java.nio.charset.StandardCharsets
 import scala.collection.JavaConversions._
-import java.sql.{DriverManager, ResultSet, Statement}
+import java.sql._
+import java.util.Properties
 import scala.collection.mutable.ListBuffer
 
 class DdVaultCatalogServlet(app: DdVaultCatalogApp,
@@ -39,6 +41,10 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
   private implicit val jsonFormats: Formats = DefaultFormats
 
   //val con_str: String = new String (app.config.dbUrl + app.config.dbPort + "/" + app.config.dbName + "?user=" + app.config.dbUser + "&password=" + app.config.dbPassword)
+  val url: String = app.config.dbUrl
+  val username: String = app.config.dbUser
+  val password: String = app.config.dbPassword
+  var conn: Connection = null
   var dataverse_pid: String = ""
   var dataverse_pid_version: String = ""
   var bag_id: String = ""
@@ -50,7 +56,7 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
   var metadata: String = ""
   var object_version_checksum = ""
 
-  var json: JObject = _
+  var json: JValue = _
 
   case class Catalog(dataverse_pid: String, dataverse_pid_version: String, bag_id: String, nbn: String, bag_file_path: String, depositor: String, title: String)
 
@@ -61,7 +67,7 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
     Ok(s"DD Vault Catalog Service running ($version)")
   }
 
-  post("/json-to-catalog") {
+  post("/bags") {
     contentType = "application/json"
     val objectMapper = new ObjectMapper()
     val rootNode = objectMapper.readTree(request.body)
@@ -84,19 +90,14 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
 
     bag_file_path = bag_file_path + bag_id + ".zip"
 
-    val con_str = "jdbc:postgresql://localhost:5433/dv2tape?user=postgres"
-    classOf[org.postgresql.Driver]
-    val conn = DriverManager.getConnection(con_str)
-
     try {
+      Class.forName("org.postgresql.Driver")
+      conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/dv2tape?user=postgres")
+      //conn = DriverManager.getConnection(url,username,password)
 
-      val update_catalog = "INSERT INTO catalog(dataverse_pid, dataverse_pid_version, bag_id, nbn,bag_file_path, depositor, title) " +
-        "VALUES(?,?,?,?,?,?,?)"
-      val catalog_stmt = conn.prepareStatement(update_catalog)
+      val catalog_stmt = conn.prepareStatement("INSERT INTO catalog(dataverse_pid, dataverse_pid_version, bag_id, nbn,bag_file_path, depositor, title) VALUES(?,?,?,?,?,?,?)")
 
-      val update_ocfl = "INSERT INTO ocfl_version(metadata, object_version_checksum, object_version_deposit_date, bag_id, object_version, object_version_file_path) " +
-        "VALUES(?,?,?,?,?,?)"
-      val ocfl_stmt = conn.prepareStatement(update_ocfl)
+      val ocfl_stmt = conn.prepareStatement("INSERT INTO ocfl_version(metadata, object_version_checksum, object_version_deposit_date, bag_id, object_version, object_version_file_path) VALUES(?,?,?,?,?,?)")
 
       catalog_stmt.setString(1, dataverse_pid)
       catalog_stmt.setString(2, dataverse_pid_version)
@@ -116,26 +117,33 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
       catalog_stmt.executeUpdate()
       ocfl_stmt.executeUpdate()
 
+      trace(response)
+      logger.info("Response: "+response)
       //TODO return proper status codes
 
+    }catch {
+      case e: Throwable => e.printStackTrace()
+    } finally {
+      if (conn != null) conn.close()
     }
 
   }
 
-  get("/catalog") {
+  get("/bags/:bagId") {
     contentType = "application/json"
+    val uuid = params("bagId")
 
-    classOf[org.postgresql.Driver]
-    val con_str = "jdbc:postgresql://localhost:5433/dv2tape?user=postgres"
-    val conn = DriverManager.getConnection(con_str)
-    var catalog_output = new ListBuffer[JObject]()
     try {
-      val stm = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+      Class.forName("org.postgresql.Driver")
+      //conn = DriverManager.getConnection(url,username,password)
+      conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/dv2tape?user=postgres")
 
-      val rs = stm.executeQuery("SELECT * from catalog NATURAL JOIN ocfl_version")
+      //val stm = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
+      val stm = conn.prepareStatement("SELECT * FROM catalog NATURAL JOIN ocfl_version WHERE bag_id = ?")
+      stm.setString(1, "urn:uuid:"+uuid)
+      val rs = stm.executeQuery()
 
-
-      while (rs.next) {
+      if (rs.next) {
 
         val catalog = Catalog(rs.getString("dataverse_pid"), rs.getString("dataverse_pid_version"), rs.getString("bag_id"), rs.getString("nbn"), rs.getString("bag_file_path"), rs.getString("depositor"), rs.getString("title"))
         val ocfl = OcflVersion(rs.getString("metadata"), rs.getString("object_version_checksum"), rs.getDate("object_version_deposit_date"), rs.getString("bag_id"), rs.getString("object_version"), rs.getString("object_version_file_path"))
@@ -148,27 +156,20 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
               ("bag_file_path" -> catalog.bag_file_path) ~
               ("depositor" -> catalog.depositor) ~
               ("title" -> catalog.title) ~
-              ("metadata" -> ocfl.metadata) ~
+              //("metadata" -> ocfl.metadata) ~
               ("object_version_checksum" -> ocfl.object_version_checksum) ~
               ("object_version_deposit_date" -> ocfl.object_version_deposit_date.toString) ~
               ("bag_id" -> ocfl.bag_id) ~
               ("object_version" -> ocfl.object_version) ~
               ("object_version_file_path" -> ocfl.object_version_file_path)
             )
-        catalog_output.append(json)
-        //println(pretty(render(json)))
+        prettyJson(render(json))
       }
+    } catch {
+      case e: Throwable => e.printStackTrace()
     } finally {
-      conn.close()
+      if (conn != null) conn.close()
     }
-    response.getOutputStream
-    //TODO fix json return body, nothing returned
-    for (json <- catalog_output){
-      json
-      //pretty(render(json))
-      //println(pretty(render(json)))
-    }
-
   }
 
 

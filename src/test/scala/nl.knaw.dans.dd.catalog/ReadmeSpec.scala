@@ -27,8 +27,6 @@ class ReadmeSpec extends AnyFlatSpec with Matchers with CustomMatchers {
     version = "my-version",
     serverPort = 12345,
     dbUrl = "some-url",
-    dbPort = 1234,
-    dbName = "some-name",
     dbUser = "some-user",
     dbPassword = "some-user"
   )

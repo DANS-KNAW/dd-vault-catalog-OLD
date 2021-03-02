@@ -23,8 +23,6 @@ import org.apache.commons.configuration.PropertiesConfiguration
 case class Configuration(version: String,
                          serverPort: Int,
                          dbUrl: String,
-                         dbPort: Int,
-                         dbName: String,
                          dbUser: String,
                          dbPassword: String
                         )
@@ -50,8 +48,6 @@ object Configuration extends DebugEnhancedLogging {
       version,
       serverPort = properties.getInt("daemon.http.port"),
       dbUrl = properties.getString("db.url"),
-      dbPort = properties.getInt("db.port"),
-      dbName = properties.getString("db.name"),
       dbUser = properties.getString("db.user"),
       dbPassword = properties.getString("db.password")
     )
