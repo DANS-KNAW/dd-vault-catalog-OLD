@@ -40,7 +40,6 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
 
   private implicit val jsonFormats: Formats = DefaultFormats
 
-  //val con_str: String = new String (app.config.dbUrl + app.config.dbPort + "/" + app.config.dbName + "?user=" + app.config.dbUser + "&password=" + app.config.dbPassword)
   val url: String = app.config.dbUrl
   val username: String = app.config.dbUser
   val password: String = app.config.dbPassword
@@ -59,7 +58,6 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
   var json: JValue = _
 
   case class Catalog(dataverse_pid: String, dataverse_pid_version: String, bag_id: String, nbn: String, bag_file_path: String, depositor: String, title: String)
-
   case class OcflVersion(metadata: String, object_version_checksum: String, object_version_deposit_date: java.sql.Date, bag_id: String, object_version: String, object_version_file_path: String)
 
   get("/") {
@@ -67,7 +65,7 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
     Ok(s"DD Vault Catalog Service running ($version)")
   }
 
-  post("/bags") {
+  put("/bags") {
     contentType = "application/json"
     val objectMapper = new ObjectMapper()
     val rootNode = objectMapper.readTree(request.body)
@@ -92,10 +90,9 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
 
     try {
       Class.forName("org.postgresql.Driver")
-      conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/dv2tape?user=postgres")
-      //conn = DriverManager.getConnection(url,username,password)
+      conn = DriverManager.getConnection(url,username,password)
 
-      val catalog_stmt = conn.prepareStatement("INSERT INTO catalog(dataverse_pid, dataverse_pid_version, bag_id, nbn,bag_file_path, depositor, title) VALUES(?,?,?,?,?,?,?)")
+      val catalog_stmt = conn.prepareStatement("INSERT INTO catalog(dataverse_pid, dataverse_pid_version, bag_id, nbn, datastation, bag_file_path, depositor, source_repo, title) VALUES(?,?,?,?,?,?,?,?,?)")
 
       val ocfl_stmt = conn.prepareStatement("INSERT INTO ocfl_version(metadata, object_version_checksum, object_version_deposit_date, bag_id, object_version, object_version_file_path) VALUES(?,?,?,?,?,?)")
 
@@ -103,15 +100,17 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
       catalog_stmt.setString(2, dataverse_pid_version)
       catalog_stmt.setString(3, bag_id)
       catalog_stmt.setString(4, nbn)
-      catalog_stmt.setString(5, bag_file_path)
-      catalog_stmt.setString(6, depositor)
-      catalog_stmt.setString(7, title)
+      catalog_stmt.setString(5, "datastation")
+      catalog_stmt.setString(6, bag_file_path)
+      catalog_stmt.setString(7, depositor)
+      catalog_stmt.setString(8, "source_repo")
+      catalog_stmt.setString(9, title)
 
       ocfl_stmt.setString(1, metadata)
-      ocfl_stmt.setString(2, object_version_checksum)
+      ocfl_stmt.setString(2, "object_version_checksum")
       ocfl_stmt.setDate(3, new java.sql.Date(System.currentTimeMillis()))
       ocfl_stmt.setString(4, bag_id)
-      ocfl_stmt.setString(5, "")
+      ocfl_stmt.setString(5, "object_version")
       ocfl_stmt.setString(6, bag_file_path)
 
       catalog_stmt.executeUpdate()
@@ -135,10 +134,8 @@ class DdVaultCatalogServlet(app: DdVaultCatalogApp,
 
     try {
       Class.forName("org.postgresql.Driver")
-      //conn = DriverManager.getConnection(url,username,password)
-      conn = DriverManager.getConnection("jdbc:postgresql://localhost:5433/dv2tape?user=postgres")
+      conn = DriverManager.getConnection(url,username,password)
 
-      //val stm = conn.createStatement(ResultSet.TYPE_FORWARD_ONLY, ResultSet.CONCUR_READ_ONLY)
       val stm = conn.prepareStatement("SELECT * FROM catalog NATURAL JOIN ocfl_version WHERE bag_id = ?")
       stm.setString(1, "urn:uuid:"+uuid)
       val rs = stm.executeQuery()
